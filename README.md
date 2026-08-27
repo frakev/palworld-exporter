@@ -1,43 +1,59 @@
-# palworld-exporter
+<div align="center">
 
-A **Prometheus exporter for a dedicated [Palworld](https://www.pocketpair.jp/palworld) server**, meant to run **on the game host itself**. It turns your server into Prometheus metrics so you can graph and alert on it in Grafana — live server health *and* deep save-file stats (Pals per player, box/party split, levels, captures, technologies, bosses…).
+# 🎮 palworld-exporter
 
-It exposes **only Palworld-related information** — no host CPU/RAM/disk — and has **no external dependency**: it talks to the game's own local APIs. Metrics come from two local sources:
+**Prometheus exporter for a dedicated [Palworld](https://www.pocketpair.jp/palworld) server — live server health _and_ deep save‑file stats, right on the game host.**
 
-- **Palworld's official REST API** (`127.0.0.1:8212`) — FPS, frame time, connected players (with ping and position), max players, server version and name.
-- **save parser** (optional, bundled in [`parser/`](parser/)) — stats derived from parsing the save files: Pals per player (box / party / lucky), level, captures, technologies, bosses, dungeons…
+[![Release](https://img.shields.io/github/v/release/frakev/palworld-exporter?logo=github&sort=semver)](https://github.com/frakev/palworld-exporter/releases/latest)
+[![CI](https://github.com/frakev/palworld-exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/frakev/palworld-exporter/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/frakev/palworld-exporter)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Palworld](https://img.shields.io/badge/Palworld-v1.0.3.101283-1f6feb)
 
-> **Compatibility:** developed against **Palworld dedicated server `v1.0.3.101283`** (Steam app `2394010`). Live metrics come from the game's REST API and are essentially version-independent; the save parser reads the `PlM1` (Oodle-compressed) save format via [`palworld-save-tools`](https://github.com/cheahjs/palworld-save-tools) `0.24.0`, so it is the part tied to a specific game version.
+[Install](#-install) · [Metrics](#-metrics) · [Securing /metrics](#-exposing--securing-metrics) · [PromQL](#-example-queries-promql)
+
+</div>
 
 ---
 
-## How it works
+Graph and alert on your Palworld server in Grafana. The exporter runs **on the game host**, exposes **only Palworld‑related information** (no host CPU/RAM/disk), and has **no external dependency** — it talks to the game's own local APIs.
 
-```
-                         Palworld host (Linux)
-  ┌──────────────────────────────────────────────────────────────┐
-  │  Palworld server — REST API  :8212  (Basic auth)   ─┐         │
-  │      └─ FPS, players, ping, version                 │ 127.0.0.1
-  │  palworld-parser  :8100  (HTTP, reads save files)  ─┤         │
-  │      └─ per-player save stats                       ▼         │
-  │  palworld-exporter  :9812  ───────►  GET /metrics  (HTTP)     │
-  └───────────────────────────────────────────┬──────────────────┘
-                                               │ scrape (firewall-restricted)
-                                               ▼
-                                   Prometheus  ───►  Grafana
+## ✨ Features
+
+- **📊 Live server metrics** — FPS, frame time, connected players (ping & position), max players, version — straight from Palworld's official REST API.
+- **🐾 Per‑player save stats** — Pals per player split into **box / party / lucky**, plus level, captures, technologies, bosses, dungeons… parsed from the save files.
+- **🔌 Standalone** — no game mod, no sidecar agent. Just the server's REST API + an optional local save parser.
+- **📦 Prebuilt Linux binaries** — download from [Releases](https://github.com/frakev/palworld-exporter/releases) (amd64 & arm64), or build from source.
+- **🔒 Hardened & read‑only** — unprivileged systemd unit, loopback‑only backends, secrets never leave the host.
+
+## 🔧 How it works
+
+```mermaid
+flowchart LR
+  subgraph host["🖥️ Palworld host (Linux)"]
+    rest["Palworld server<br/>REST API · :8212"]
+    parser["palworld-parser<br/>:8100 · reads saves"]
+    exp["palworld-exporter<br/>:9812 · /metrics"]
+    rest -->|127.0.0.1| exp
+    parser -->|127.0.0.1| exp
+  end
+  exp -->|scrape<br/>firewall-restricted| prom["Prometheus"]
+  prom --> graf["Grafana"]
 ```
 
 On every scrape the exporter:
 
-1. calls the parser's `/metrics-data` (a cached snapshot — cheap) for save-derived per-player stats;
+1. reads the parser's `/metrics-data` (a cached snapshot — cheap) for save‑derived per‑player stats;
 2. calls the game's REST API (`/v1/api/metrics`, `/v1/api/info`, `/v1/api/players`) for live server state;
 3. renders everything as Prometheus text.
 
-Each source is best-effort and independent: if the parser is down you still get live metrics (`palworld_stats_up 0`); if the server is stopped you still get save stats and `palworld_game_online 0`.
+Each source is independent and best‑effort: if the parser is down you still get live metrics (`palworld_stats_up 0`); if the server is stopped you still get save stats and `palworld_game_online 0`.
 
-## Requirements
+> **Compatibility** — developed against **Palworld dedicated server `v1.0.3.101283`** (Steam app `2394010`). Live metrics come from the REST API and are essentially version‑independent; the save parser reads the `PlM1` (Oodle‑compressed) format via [`palworld-save-tools`](https://github.com/cheahjs/palworld-save-tools) `0.24.0`, so it's the part tied to a game version.
 
-- **Palworld's REST API enabled.** In `PalWorldSettings.ini`:
+## ✅ Requirements
+
+- **Palworld's REST API enabled** in `PalWorldSettings.ini`:
 
   ```ini
   RESTAPIEnabled=True
@@ -45,49 +61,43 @@ Each source is best-effort and independent: if the parser is down you still get 
   AdminPassword="your-admin-password"
   ```
 
-  The exporter authenticates as `admin` with `AdminPassword` over loopback. No game server mod or agent is required.
+  The exporter authenticates as `admin` with `AdminPassword` over loopback. No mod or agent required.
 
-- **Python ≥ 3.11** on the host *only if* you want the save-stats parser (it needs the `pyooz` Oodle wheel). On RHEL/Rocky 9: `sudo dnf install -y python3.12`. Without it, the exporter still serves all live metrics.
+- **Python ≥ 3.11** on the host — _only_ if you want the save‑stats parser (it needs the `pyooz` Oodle wheel). On RHEL/Rocky 9: `sudo dnf install -y python3.12`. Without it, live metrics still work.
+- **Prometheus** to scrape it (plain Prometheus, kube‑prometheus‑stack, …).
 
-- **Prometheus** to scrape it (plain Prometheus, kube-prometheus-stack, etc.).
+## 🚀 Install
 
-## Install
+### Prebuilt binary (recommended)
 
-Both components install as hardened systemd services. Run from a machine that can SSH to the game host:
-
-```bash
-# 1) The exporter (live metrics: FPS, players, ping).
-#    Reads AdminPassword + REST port from PalWorldSettings.ini automatically.
-make deploy REMOTE=user@game-host HOME_IP=<IP allowed to scrape /metrics>
-
-# 2) The save-stats parser (per-player Pals box/party, levels, captures…).
-#    Point SAVE_DIR at your SaveGames folder (the world sub-folder is auto-detected).
-make parser-deploy REMOTE=user@game-host SAVE_DIR=/path/to/Pal/Saved/SaveGames
-```
-
-`install.sh` (exporter): extracts `AdminPassword`/`RESTAPIPort` from the `.ini`, creates an unprivileged system user, opens port `9812` **only to `HOME_IP`** (firewalld/ufw), installs a locked-down unit. `HOME_IP` is the source IP the game host sees when Prometheus scrapes it — see [Exposing & securing `/metrics`](#exposing--securing-metrics) if that IP is dynamic or Prometheus lives elsewhere. `install.sh` (parser): builds a Python venv, reads the local saves, re-parses every 5 min, listens on `127.0.0.1` only.
-
-Local checks on the host:
+Static Linux binaries (amd64 & arm64) ship on every [**release**](https://github.com/frakev/palworld-exporter/releases) — no Go toolchain needed. Each tarball bundles the binary, `install.sh`, the systemd unit, `config.example.env`, and the `parser/` sources.
 
 ```bash
-curl -s http://127.0.0.1:9812/metrics | head
-curl -s http://127.0.0.1:8100/metrics-data | head   # parser snapshot (JSON)
-```
-
-### Download a prebuilt binary
-
-Every release ships static Linux binaries (amd64 & arm64) on the
-[**Releases**](https://github.com/frakev/palworld-exporter/releases) page — no Go toolchain needed. Each tarball bundles the binary, `install.sh`, the systemd unit, `config.example.env`, and the `parser/` sources.
-
-```bash
-# pick the archive for your architecture from the latest release
+# grab the archive for your arch from the latest release (see Releases for the exact name)
 curl -sSL -o palworld-exporter.tar.gz \
-  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_<version>_linux_amd64.tar.gz
+  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_v0.1.0_linux_amd64.tar.gz
 tar -xzf palworld-exporter.tar.gz && cd palworld-exporter_*_linux_amd64
-sudo ./install.sh --home-ip <IP allowed to scrape /metrics>
+
+# <IP> = the source IP the game host sees when Prometheus scrapes it (see "Securing /metrics")
+sudo ./install.sh --home-ip <IP>
 ```
 
-Checksums are published as `checksums.txt` alongside the archives.
+`install.sh` auto‑detects `AdminPassword`/`RESTAPIPort` from the `.ini`, creates an unprivileged system user, opens port `9812` **only to `<IP>`** (firewalld/ufw), and installs a locked‑down unit. Checksums are published as `checksums.txt`.
+
+For the save‑stats parser (optional):
+
+```bash
+sudo ./parser/install.sh --save-dir /path/to/Pal/Saved/SaveGames
+```
+
+### From a checkout (remote deploy)
+
+Run from a machine that can SSH to the game host:
+
+```bash
+make deploy REMOTE=user@game-host HOME_IP=<IP>                              # exporter
+make parser-deploy REMOTE=user@game-host SAVE_DIR=/path/to/SaveGames        # parser
+```
 
 ### Build from source
 
@@ -96,27 +106,34 @@ make build      # -> ./palworld-exporter (static, CGO-free)
 make test
 ```
 
-## Configuration
+### Verify
 
-Exporter — `/etc/palworld-exporter/exporter.env` (see [`config.example.env`](config.example.env)):
+```bash
+curl -s http://127.0.0.1:9812/metrics | head
+curl -s http://127.0.0.1:8100/metrics-data | head   # parser snapshot (JSON)
+```
+
+## ⚙️ Configuration
+
+**Exporter** — `/etc/palworld-exporter/exporter.env` (see [`config.example.env`](config.example.env)):
 
 | Key | Default | Purpose |
 |---|---|---|
 | `LISTEN` | `:9812` | HTTP listen address for `/metrics` |
 | `REST_URL` | `http://127.0.0.1:8212` | Palworld REST API base URL |
-| `REST_USER` | `admin` | Basic-auth user |
+| `REST_USER` | `admin` | Basic‑auth user |
 | `REST_PASSWORD` | — | the server's `AdminPassword`; empty = live metrics disabled |
-| `PARSER_URL` | `http://127.0.0.1:8100` | save-stats parser; empty = no save metrics |
-| `METRICS_TOKEN` | *(empty)* | if set, `/metrics` requires `Authorization: Bearer <token>` |
+| `PARSER_URL` | `http://127.0.0.1:8100` | save‑stats parser; empty = no save metrics |
+| `METRICS_TOKEN` | _(empty)_ | if set, `/metrics` requires `Authorization: Bearer <token>` |
 
-Parser — `/etc/palworld-parser/parser.env` (see [`parser/config.example.env`](parser/config.example.env)). The one setting to get right is **`SAVE_DIR`**, your `SaveGames` folder:
+**Parser** — `/etc/palworld-parser/parser.env` (see [`parser/config.example.env`](parser/config.example.env)). The one setting to get right is **`SAVE_DIR`**, your `SaveGames` folder:
 
 ```bash
 SAVE_DIR=/home/steam/Steam/steamapps/common/PalServer/Pal/Saved/SaveGames
 REPARSE_INTERVAL=300     # re-parse the saves every 5 min (0 = disabled)
 ```
 
-## Prometheus scrape config
+## 📡 Prometheus scrape config
 
 ```yaml
 scrape_configs:
@@ -130,23 +147,30 @@ scrape_configs:
     #   credentials: "<METRICS_TOKEN>"
 ```
 
-## Exposing & securing `/metrics`
+## 🔐 Exposing & securing `/metrics`
 
-`/metrics` is **plain HTTP with no authentication by default** and includes information about your server (player names, positions, FPS…). So you must not leave port `9812` open to the whole internet. Pick **one** of these:
+`/metrics` is **plain HTTP, unauthenticated by default**, and includes information about your server (player names, positions, FPS…). Don't leave port `9812` open to the whole internet — pick **one**:
 
-### Option A — firewall to a single source IP (installer default)
+<table>
+<tr><th>Option A — firewall to one source IP <em>(installer default)</em></th></tr>
+<tr><td>
 
-`install.sh --home-ip <IP>` restricts the port to one source address: the machine that scrapes it. The value is **the source IP the game host sees when Prometheus connects**, which depends on where Prometheus runs:
+`install.sh --home-ip <IP>` restricts the port to one source address: the machine that scrapes it. `<IP>` is **the source IP the game host sees when Prometheus connects**:
 
-| Where Prometheus runs | `--home-ip` value |
+| Where Prometheus runs | `<IP>` to use |
 |---|---|
-| On the **same machine** as the Palworld server | `127.0.0.1` (nothing is opened to the network) |
-| On the **same LAN** as the game host | Prometheus's LAN IP |
-| On another site / at home, behind a router (Prometheus scrapes a remote game host) | **the public IP of that network** (e.g. `curl ifconfig.me` from there) — because of NAT, all its traffic arrives with that one address |
+| **Same machine** as the server | `127.0.0.1` (nothing opened to the network) |
+| **Same LAN** as the game host | Prometheus's LAN IP |
+| Elsewhere, behind a router (remote game host) | the **public IP** of that network (`curl ifconfig.me` from there) — NAT makes all its traffic arrive from that one address |
 
-Simple and dependency-free, but awkward if that IP is **dynamic** (it changes) — then prefer option B.
+Simple and dependency‑free, but awkward if that IP is **dynamic** — then prefer option B.
 
-### Option B — bearer token (good for dynamic IPs)
+</td></tr>
+</table>
+
+<table>
+<tr><th>Option B — bearer token <em>(good for dynamic IPs)</em></th></tr>
+<tr><td>
 
 Set a token in `/etc/palworld-exporter/exporter.env` and restart the service:
 
@@ -154,7 +178,7 @@ Set a token in `/etc/palworld-exporter/exporter.env` and restart the service:
 METRICS_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc A-Za-z0-9)
 ```
 
-Now `/metrics` rejects requests without `Authorization: Bearer <token>`, so the port can be reachable from more than one address. Give the same token to Prometheus:
+Now `/metrics` rejects requests without `Authorization: Bearer <token>`, so the port can be reachable from more than one address. Give Prometheus the same token:
 
 ```yaml
     authorization:
@@ -162,11 +186,21 @@ Now `/metrics` rejects requests without `Authorization: Bearer <token>`, so the 
       credentials: "<METRICS_TOKEN>"
 ```
 
-You can also combine A with B for defence in depth.
+</td></tr>
+</table>
 
-## Metrics
+You can combine A with B for defence in depth.
 
-All gauges, prefixed `palworld_`.
+## 📈 Metrics
+
+All gauges, prefixed `palworld_`. Highlights:
+
+- **Server** — `palworld_game_online`, `palworld_server_fps`, `palworld_players_current`
+- **Per player (live)** — `palworld_player_online`, `palworld_player_ping_ms`
+- **Per player (saves)** — `palworld_player_pals_box`, `palworld_player_pals_party`, `palworld_player_pals_lucky`, `palworld_player_level`, `palworld_player_captures`
+
+<details>
+<summary><b>Full metrics reference</b></summary>
 
 ### Live server & game (via the REST API)
 
@@ -190,7 +224,7 @@ All gauges, prefixed `palworld_`.
 | `palworld_stats_up` | 1 if the parser responds |
 | `palworld_stats_snapshot_timestamp_seconds` | last save parse (epoch) |
 | `palworld_guilds_total` / `palworld_players_known_total` | guilds / known players |
-| `palworld_pals_total` / `palworld_pals_lucky_total` | owned / lucky Pals (server-wide) |
+| `palworld_pals_total` / `palworld_pals_lucky_total` | owned / lucky Pals (server‑wide) |
 | `palworld_player_level` / `palworld_player_exp` | level / XP |
 | `palworld_player_pals_owned` | total Pals owned |
 | **`palworld_player_pals_box`** | **Pals in the palbox** |
@@ -206,9 +240,12 @@ All gauges, prefixed `palworld_`.
 | `palworld_player_effigies` / `palworld_player_quests_completed` | effigies / quests |
 | `palworld_player_last_online_timestamp_seconds` | last login (epoch) |
 
-`palworld_game_*` and per-connected-player metrics only appear while the server is running; save stats stay available even when it is stopped.
+</details>
 
-### Sample output
+`palworld_game_*` and per‑connected‑player metrics only appear while the server is running; save stats stay available even when it is stopped.
+
+<details>
+<summary><b>Sample output</b></summary>
 
 ```prometheus
 palworld_game_online 1
@@ -227,7 +264,9 @@ palworld_player_pals_lucky{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 2
 palworld_player_captures{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 410
 ```
 
-## Example queries (PromQL)
+</details>
+
+## 🔎 Example queries (PromQL)
 
 ```promql
 # Connected players over time
@@ -249,17 +288,17 @@ palworld_game_online == 0
 time() - palworld_stats_snapshot_timestamp_seconds > 3600
 ```
 
-## Security
+## 🛡️ Security
 
-- The exporter is **read-only** and needs no privileges (its systemd unit runs with `NoNewPrivileges`, `ProtectSystem=strict`, a syscall filter, etc.).
-- It reaches the game and the parser over **loopback only**. Your `AdminPassword` lives in `exporter.env` (mode `0640`, owned by the exporter user) and never leaves the host.
-- `/metrics` is plain HTTP and unauthenticated by default — lock it down with a firewall rule or a bearer token. See [Exposing & securing `/metrics`](#exposing--securing-metrics).
+- **Read‑only, unprivileged** — the systemd unit runs with `NoNewPrivileges`, `ProtectSystem=strict`, a syscall filter, etc.
+- **Loopback‑only backends** — the game REST API and the parser are reached over `127.0.0.1`. Your `AdminPassword` lives in `exporter.env` (mode `0640`, owned by the exporter user) and never leaves the host.
+- **Lock down `/metrics`** — plain HTTP and unauthenticated by default; use a firewall rule or a bearer token → [Exposing & securing `/metrics`](#-exposing--securing-metrics).
 - **Never commit** a real `*.env`, password, or save file — see [`.gitignore`](.gitignore).
 
-## How the save parser works
+## 🧩 How the save parser works
 
-The parser reads `Level.sav` + `Players/*.sav` from your `SaveGames` world folder, decompresses the `PlM1`/Oodle blocks (`pyooz`), decodes the GVAS structures (`palworld-save-tools`), and aggregates per-player counters and Pal container membership (box vs party vs base). It caches a snapshot in SQLite and re-parses on an interval, so scrapes stay cheap. It listens on `127.0.0.1` only and exposes `GET /metrics-data` (JSON) for the exporter. Because it depends on the save format, it is the component tied to a specific game version (`v1.0.3.101283`).
+The parser reads `Level.sav` + `Players/*.sav` from your `SaveGames` world folder, decompresses the `PlM1`/Oodle blocks (`pyooz`), decodes the GVAS structures (`palworld-save-tools`), and aggregates per‑player counters and Pal container membership (box vs party vs base). It caches a snapshot in SQLite and re‑parses on an interval, so scrapes stay cheap. It listens on `127.0.0.1` only and serves `GET /metrics-data` (JSON). Because it depends on the save format, it's the component tied to a specific game version (`v1.0.3.101283`).
 
-## License
+## 📄 License
 
 [MIT](LICENSE) © frakev

@@ -1,0 +1,51 @@
+name: release
+
+# Publie des binaires Linux prêts à l'emploi à chaque tag « vX.Y.Z ».
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # nécessaire pour créer la Release et y attacher les fichiers
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          for pair in linux/amd64 linux/arm64; do
+            export GOOS="${pair%/*}" GOARCH="${pair#*/}"
+            stage="palworld-exporter_${VERSION}_${GOOS}_${GOARCH}"
+            mkdir -p "stage/${stage}"
+            CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+              -o "stage/${stage}/palworld-exporter" .
+            # Bundle the exporter binary with everything needed to install it,
+            # plus the (source) save-stats parser.
+            cp README.md LICENSE config.example.env palworld-exporter.service install.sh \
+              "stage/${stage}/"
+            cp -r parser "stage/${stage}/parser"
+            tar -C stage -czf "dist/${stage}.tar.gz" "${stage}"
+          done
+          cd dist && sha256sum *.tar.gz > checksums.txt
+          echo "Artifacts:" && ls -lh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+          generate_release_notes: true

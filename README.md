@@ -74,6 +74,21 @@ curl -s http://127.0.0.1:9812/metrics | head
 curl -s http://127.0.0.1:8100/metrics-data | head   # parser snapshot (JSON)
 ```
 
+### Download a prebuilt binary
+
+Every release ships static Linux binaries (amd64 & arm64) on the
+[**Releases**](https://github.com/frakev/palworld-exporter/releases) page — no Go toolchain needed. Each tarball bundles the binary, `install.sh`, the systemd unit, `config.example.env`, and the `parser/` sources.
+
+```bash
+# pick the archive for your architecture from the latest release
+curl -sSL -o palworld-exporter.tar.gz \
+  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_<version>_linux_amd64.tar.gz
+tar -xzf palworld-exporter.tar.gz && cd palworld-exporter_*_linux_amd64
+sudo ./install.sh --home-ip <IP allowed to scrape /metrics>
+```
+
+Checksums are published as `checksums.txt` alongside the archives.
+
 ### Build from source
 
 ```bash

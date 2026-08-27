@@ -17,3 +17,7 @@ venv/
 *.sav
 *.pem
 *.key
+
+# Release build output
+/dist/
+/stage/

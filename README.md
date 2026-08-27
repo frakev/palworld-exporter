@@ -144,7 +144,7 @@ scrape_configs:
 | On the **same LAN** as the game host | Prometheus's LAN IP |
 | On another site / at home, behind a router (Prometheus scrapes a remote game host) | **the public IP of that network** (e.g. `curl ifconfig.me` from there) — because of NAT, all its traffic arrives with that one address |
 
-Simple and dependency-free, but awkward if that IP is **dynamic** (it changes) — then prefer B or C.
+Simple and dependency-free, but awkward if that IP is **dynamic** (it changes) — then prefer option B.
 
 ### Option B — bearer token (good for dynamic IPs)
 
@@ -162,11 +162,7 @@ Now `/metrics` rejects requests without `Authorization: Bearer <token>`, so the 
       credentials: "<METRICS_TOKEN>"
 ```
 
-### Option C — private tunnel (cleanest)
-
-Put the game host and Prometheus on a private network ([WireGuard](https://www.wireguard.com/), [Tailscale](https://tailscale.com/)…) and scrape the tunnel address. Nothing is exposed publicly and there is no fixed-IP requirement. You can then bind the exporter to the tunnel interface (`LISTEN=<tunnel-ip>:9812`) or firewall to the tunnel subnet.
-
-You can also combine A/C with B for defence in depth.
+You can also combine A with B for defence in depth.
 
 ## Metrics
 
@@ -257,7 +253,7 @@ time() - palworld_stats_snapshot_timestamp_seconds > 3600
 
 - The exporter is **read-only** and needs no privileges (its systemd unit runs with `NoNewPrivileges`, `ProtectSystem=strict`, a syscall filter, etc.).
 - It reaches the game and the parser over **loopback only**. Your `AdminPassword` lives in `exporter.env` (mode `0640`, owned by the exporter user) and never leaves the host.
-- `/metrics` is plain HTTP and unauthenticated by default — lock it down with a firewall rule, a bearer token, or a private tunnel. See [Exposing & securing `/metrics`](#exposing--securing-metrics).
+- `/metrics` is plain HTTP and unauthenticated by default — lock it down with a firewall rule or a bearer token. See [Exposing & securing `/metrics`](#exposing--securing-metrics).
 - **Never commit** a real `*.env`, password, or save file — see [`.gitignore`](.gitignore).
 
 ## How the save parser works

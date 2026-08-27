@@ -1,0 +1,33 @@
+[Unit]
+Description=Exporter Prometheus du serveur Palworld
+Documentation=https://github.com/frakev/services/tree/main/palworld
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=palworld-exporter
+Group=palworld-exporter
+ExecStart=/usr/local/bin/palworld-exporter -config /etc/palworld-exporter/exporter.env
+Restart=always
+RestartSec=5
+
+# Durcissement — l'exporter ne fait que lire l'agent en HTTP et servir /metrics :
+# il n'a besoin d'aucun privilège, contrairement à l'agent. On serre donc tout.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

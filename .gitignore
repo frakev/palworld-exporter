@@ -1,0 +1,19 @@
+# Go build artifacts
+/palworld-exporter
+*.test
+*.out
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local config / data (never commit real tokens or saves)
+*.env
+!config.example.env
+!parser/config.example.env
+*.db
+*.sav
+*.pem
+*.key

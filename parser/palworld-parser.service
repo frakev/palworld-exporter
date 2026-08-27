@@ -1,0 +1,33 @@
+[Unit]
+Description=Parser de sauvegardes Palworld (stats pour l'exporter Prometheus)
+Documentation=https://github.com/frakev/palworld-exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User/Group réécrits par install.sh vers le propriétaire des sauvegardes.
+User=steam
+Group=steam
+ExecStart=/opt/palworld-parser/venv/bin/python /opt/palworld-parser/app/server.py
+EnvironmentFile=/etc/palworld-parser/parser.env
+Restart=always
+RestartSec=10
+
+# N'écoute qu'en 127.0.0.1 (cf. server.py) : l'exporter local le lit, rien à
+# ouvrir dans le pare-feu. Durcissement raisonnable — l'accès aux sauvegardes
+# (souvent sous /home) interdit ProtectHome.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=false
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true
+# La base SQLite des snapshots vit ici.
+ReadWritePaths=/var/lib/palworld-parser
+
+[Install]
+WantedBy=multi-user.target

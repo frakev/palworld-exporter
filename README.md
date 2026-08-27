@@ -65,7 +65,7 @@ make deploy REMOTE=user@game-host HOME_IP=<IP allowed to scrape /metrics>
 make parser-deploy REMOTE=user@game-host SAVE_DIR=/path/to/Pal/Saved/SaveGames
 ```
 
-`install.sh` (exporter): extracts `AdminPassword`/`RESTAPIPort` from the `.ini`, creates an unprivileged system user, opens port `9812` **only to `HOME_IP`** (firewalld/ufw), installs a locked-down unit. `install.sh` (parser): builds a Python venv, reads the local saves, re-parses every 5 min, listens on `127.0.0.1` only.
+`install.sh` (exporter): extracts `AdminPassword`/`RESTAPIPort` from the `.ini`, creates an unprivileged system user, opens port `9812` **only to `HOME_IP`** (firewalld/ufw), installs a locked-down unit. `HOME_IP` is the source IP the game host sees when Prometheus scrapes it — see [Exposing & securing `/metrics`](#exposing--securing-metrics) if that IP is dynamic or Prometheus lives elsewhere. `install.sh` (parser): builds a Python venv, reads the local saves, re-parses every 5 min, listens on `127.0.0.1` only.
 
 Local checks on the host:
 
@@ -118,19 +118,55 @@ REPARSE_INTERVAL=300     # re-parse the saves every 5 min (0 = disabled)
 
 ## Prometheus scrape config
 
-The exporter serves plain HTTP. Restrict the port with a firewall (the installer does this for `HOME_IP`).
-
 ```yaml
 scrape_configs:
   - job_name: palworld
     scrape_interval: 30s
     static_configs:
       - targets: ["<game-host>:9812"]
-    # If METRICS_TOKEN is set on the exporter:
+    # If METRICS_TOKEN is set on the exporter (see below):
     # authorization:
     #   type: Bearer
     #   credentials: "<METRICS_TOKEN>"
 ```
+
+## Exposing & securing `/metrics`
+
+`/metrics` is **plain HTTP with no authentication by default** and includes information about your server (player names, positions, FPS…). So you must not leave port `9812` open to the whole internet. Pick **one** of these:
+
+### Option A — firewall to a single source IP (installer default)
+
+`install.sh --home-ip <IP>` restricts the port to one source address: the machine that scrapes it. The value is **the source IP the game host sees when Prometheus connects**, which depends on where Prometheus runs:
+
+| Where Prometheus runs | `--home-ip` value |
+|---|---|
+| On the **same machine** as the Palworld server | `127.0.0.1` (nothing is opened to the network) |
+| On the **same LAN** as the game host | Prometheus's LAN IP |
+| On another site / at home, behind a router (Prometheus scrapes a remote game host) | **the public IP of that network** (e.g. `curl ifconfig.me` from there) — because of NAT, all its traffic arrives with that one address |
+
+Simple and dependency-free, but awkward if that IP is **dynamic** (it changes) — then prefer B or C.
+
+### Option B — bearer token (good for dynamic IPs)
+
+Set a token in `/etc/palworld-exporter/exporter.env` and restart the service:
+
+```bash
+METRICS_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc A-Za-z0-9)
+```
+
+Now `/metrics` rejects requests without `Authorization: Bearer <token>`, so the port can be reachable from more than one address. Give the same token to Prometheus:
+
+```yaml
+    authorization:
+      type: Bearer
+      credentials: "<METRICS_TOKEN>"
+```
+
+### Option C — private tunnel (cleanest)
+
+Put the game host and Prometheus on a private network ([WireGuard](https://www.wireguard.com/), [Tailscale](https://tailscale.com/)…) and scrape the tunnel address. Nothing is exposed publicly and there is no fixed-IP requirement. You can then bind the exporter to the tunnel interface (`LISTEN=<tunnel-ip>:9812`) or firewall to the tunnel subnet.
+
+You can also combine A/C with B for defence in depth.
 
 ## Metrics
 
@@ -221,7 +257,7 @@ time() - palworld_stats_snapshot_timestamp_seconds > 3600
 
 - The exporter is **read-only** and needs no privileges (its systemd unit runs with `NoNewPrivileges`, `ProtectSystem=strict`, a syscall filter, etc.).
 - It reaches the game and the parser over **loopback only**. Your `AdminPassword` lives in `exporter.env` (mode `0640`, owned by the exporter user) and never leaves the host.
-- `/metrics` is plain HTTP with no secrets in it; the installer firewalls the port to a single source IP. Set `METRICS_TOKEN` if you also want bearer auth on the endpoint.
+- `/metrics` is plain HTTP and unauthenticated by default — lock it down with a firewall rule, a bearer token, or a private tunnel. See [Exposing & securing `/metrics`](#exposing--securing-metrics).
 - **Never commit** a real `*.env`, password, or save file — see [`.gitignore`](.gitignore).
 
 ## How the save parser works

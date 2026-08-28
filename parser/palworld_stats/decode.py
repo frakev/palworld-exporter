@@ -111,6 +111,38 @@ def _property_with_set(self, type_name, size, path, nested_caller_path=""):
 FArchiveReader.property = _property_with_set
 
 
+# --------------------------------------------------------------------------- #
+#  Valeurs de map : types scalaires inconnus de palworld-save-tools 0.24.0
+# --------------------------------------------------------------------------- #
+# ``prop_value`` (clés et valeurs de ``MapProperty``) ne gère que Struct, Enum,
+# Name, Int et Bool. Un patch du jeu a ajouté
+# ``.worldSaveData.LevelObjectRecoverPartySaveData.Value.PlayerLastUsedTimes``,
+# une map ``Guid → Int64Property`` : la lib levait « Unknown property value
+# type: Int64Property » et *tout* le parse échouait. On complète la table avec
+# les scalaires dont l'encodage est non ambigu — on ne lit aucun de ces champs,
+# il s'agit juste de traverser la map sans se désynchroniser.
+_MAP_VALUE_READERS = {
+    "Int64Property": FArchiveReader.i64,
+    "UInt32Property": FArchiveReader.u32,
+    "UInt64Property": FArchiveReader.u64,
+    "FloatProperty": FArchiveReader.float,
+    "DoubleProperty": FArchiveReader.double,
+    "StrProperty": FArchiveReader.fstring,
+}
+
+_orig_prop_value = FArchiveReader.prop_value
+
+
+def _prop_value_with_scalars(self, type_name, struct_type_name, path):
+    reader = _MAP_VALUE_READERS.get(type_name)
+    if reader is not None:
+        return reader(self)
+    return _orig_prop_value(self, type_name, struct_type_name, path)
+
+
+FArchiveReader.prop_value = _prop_value_with_scalars
+
+
 @contextlib.contextmanager
 def _quiet():
     """palworld-save-tools écrit des avertissements « Struct type … » via

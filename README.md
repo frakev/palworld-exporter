@@ -147,6 +147,16 @@ scrape_configs:
     #   credentials: "<METRICS_TOKEN>"
 ```
 
+## 📊 Grafana dashboard
+
+A ready‑made dashboard lives in [`grafana/palworld.json`](grafana/palworld.json). Import it in Grafana (**Dashboards → New → Import → Upload JSON**) and pick your Prometheus data source. It has three rows:
+
+- **Overview** — server status (online/offline), players online, FPS, uptime, and save totals (Pals, lucky Pals, guilds, known players), plus players‑online and FPS time series.
+- **Players** — one row per player: level, Pals owned / box / party / lucky, captures, techs, XP, last online. Filter with the **Guild** and **Player** variables at the top.
+- **Guilds** — one row per guild: members, top level, total Pals, lucky, captures.
+
+The Players and Guilds tables are built from the save‑stats metrics, so they need the parser running; the Overview works with live metrics alone.
+
 ## 🔐 Exposing & securing `/metrics`
 
 `/metrics` is **plain HTTP, unauthenticated by default**, and includes information about your server (player names, positions, FPS…). Don't leave port `9812` open to the whole internet — pick **one**:

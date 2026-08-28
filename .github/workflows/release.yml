@@ -45,6 +45,9 @@ jobs:
       # Le corps de la Release vient du message du tag annoté (« git tag -a »),
       # complété par les notes générées par GitHub. Sans ça, une release n'a que
       # son changelog automatique et n'explique rien.
+      # ⚠ Taguer avec « git tag -a --cleanup=verbatim » : par défaut git applique
+      #   cleanup=strip, qui supprime toute ligne commençant par « # » — donc les
+      #   titres markdown des notes.
       - name: Release notes from the tag annotation
         run: |
           set -euo pipefail

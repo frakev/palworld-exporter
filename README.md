@@ -75,7 +75,7 @@ Static Linux binaries (amd64 & arm64) ship on every [**release**](https://github
 ```bash
 # grab the archive for your arch from the latest release (see Releases for the exact name)
 curl -sSL -o palworld-exporter.tar.gz \
-  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_v0.1.2_linux_amd64.tar.gz
+  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_v0.2.0_linux_amd64.tar.gz
 tar -xzf palworld-exporter.tar.gz && cd palworld-exporter_*_linux_amd64
 
 # <IP> = the source IP the game host sees when Prometheus scrapes it (see "Securing /metrics")
@@ -153,7 +153,7 @@ A ready‑made dashboard lives in [`grafana/palworld.json`](grafana/palworld.jso
 
 - **Overview** — server status (online/offline), players online, FPS, uptime, and save totals (Pals, lucky Pals, guilds, known players), plus players‑online and FPS time series.
 - **Players** — one row per player: level, Pals owned / box / party / lucky, captures, techs, XP, last online. Filter with the **Guild** and **Player** variables at the top.
-- **Guilds** — one row per guild: members, top level, total Pals, lucky, captures.
+- **Guilds** — one row per guild (keyed by `guild_id`, since names collide): members, top level, total Pals, lucky, captures.
 
 The Players and Guilds tables are built from the save‑stats metrics, so they need the parser running; the Overview works with live metrics alone.
 
@@ -227,7 +227,11 @@ All gauges, prefixed `palworld_`. Highlights:
 | `palworld_player_location_x{…}` / `_y{…}` | connected player map position |
 | `palworld_scrape_duration_seconds` | collection time |
 
-### Save stats (via the parser — labels `uid,name,guild`)
+### Save stats (via the parser — labels `uid,name,guild,guild_id`)
+
+> Guild names are **not unique** — Palworld names every guild `Unnamed Guild` until
+> someone renames it. Aggregate by `guild_id` (the 8‑hex guild identifier, same shape
+> as a player `uid`), not by `guild`, or distinct guilds collapse into one.
 
 | Metric | Description |
 |---|---|
@@ -267,11 +271,11 @@ palworld_player_ping_ms{name="Alice",player_id="abc123"} 42.5
 palworld_stats_up 1
 palworld_pals_total 137
 palworld_pals_lucky_total 3
-palworld_player_level{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 42
-palworld_player_pals_box{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 25
-palworld_player_pals_party{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 5
-palworld_player_pals_lucky{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 2
-palworld_player_captures{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 410
+palworld_player_level{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 42
+palworld_player_pals_box{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 25
+palworld_player_pals_party{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 5
+palworld_player_pals_lucky{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 2
+palworld_player_captures{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 410
 ```
 
 </details>

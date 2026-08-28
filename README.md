@@ -75,7 +75,7 @@ Static Linux binaries (amd64 & arm64) ship on every [**release**](https://github
 ```bash
 # grab the archive for your arch from the latest release (see Releases for the exact name)
 curl -sSL -o palworld-exporter.tar.gz \
-  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_v0.1.1_linux_amd64.tar.gz
+  https://github.com/frakev/palworld-exporter/releases/latest/download/palworld-exporter_v0.1.2_linux_amd64.tar.gz
 tar -xzf palworld-exporter.tar.gz && cd palworld-exporter_*_linux_amd64
 
 # <IP> = the source IP the game host sees when Prometheus scrapes it (see "Securing /metrics")

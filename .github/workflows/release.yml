@@ -42,9 +42,20 @@ jobs:
           cd dist && sha256sum *.tar.gz > checksums.txt
           echo "Artifacts:" && ls -lh
 
+      # Le corps de la Release vient du message du tag annoté (« git tag -a »),
+      # complété par les notes générées par GitHub. Sans ça, une release n'a que
+      # son changelog automatique et n'explique rien.
+      - name: Release notes from the tag annotation
+        run: |
+          set -euo pipefail
+          git fetch --force --depth=1 origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+          echo "--- notes ---" && cat RELEASE_NOTES.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_NOTES.md
           files: |
             dist/*.tar.gz
             dist/checksums.txt

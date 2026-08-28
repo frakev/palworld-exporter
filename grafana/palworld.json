@@ -252,6 +252,14 @@
         { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "palworld_player_last_online_timestamp_seconds{name=~\"$player\", guild=~\"$guild\"} * 1000", "refId": "I", "format": "table", "instant": true }
       ],
       "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+            "renameByName": {},
+            "indexByName": {}
+          }
+        },
         { "id": "merge", "options": {} },
         {
           "id": "organize",

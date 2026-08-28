@@ -155,14 +155,19 @@ PLAYER_SAV_RE = re.compile(r"^[0-9a-f]{32}\.sav$", re.IGNORECASE)
 def _world_dir() -> str:
     """Dossier contenant ``Level.sav``. En sidecar cluster, l'app dépose le
     bundle directement dans ``SAVE_DIR``. Sur l'hôte de jeu, ``SAVE_DIR`` pointe
-    sur ``SaveGames`` et le monde est un sous-dossier (identifiant hexadécimal) :
-    on le résout automatiquement."""
+    sur ``SaveGames`` et le monde est imbriqué dessous : ``SaveGames/<hexa>``,
+    ou ``SaveGames/0/<hexa>`` sur un serveur dédié (le ``0`` est l'index de
+    profil local). On résout les deux profondeurs automatiquement, en écartant
+    les copies de ``<monde>/backup/world/<date>/``."""
     if os.path.exists(os.path.join(SAVE_DIR, "Level.sav")):
         return SAVE_DIR
-    candidates = [
-        d for d in glob.glob(os.path.join(SAVE_DIR, "*"))
-        if os.path.isfile(os.path.join(d, "Level.sav"))
-    ]
+    candidates = []
+    for depth in ("*", os.path.join("*", "*")):
+        for level in glob.glob(os.path.join(SAVE_DIR, depth, "Level.sav")):
+            rel = os.path.relpath(level, SAVE_DIR).split(os.sep)
+            if "backup" in rel:
+                continue
+            candidates.append(os.path.dirname(level))
     # Le monde actif est le plus récemment modifié (utile si plusieurs mondes).
     candidates.sort(key=lambda d: os.path.getmtime(os.path.join(d, "Level.sav")))
     return candidates[-1] if candidates else SAVE_DIR

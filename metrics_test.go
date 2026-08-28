@@ -45,7 +45,7 @@ func fakeParser(t *testing.T) *statsClient {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics-data", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"taken_at":1787800000,"guild_count":1,"player_count":1,"pal_count":137,"lucky_count":3,
-			"players":[{"uid":"a1b2c3d4","name":"Alice","guild":"ExampleWorld","level":42,"exp":123456,
+			"players":[{"uid":"a1b2c3d4","name":"Alice","guild":"ExampleWorld","guild_id":"9f0e1d2c","level":42,"exp":123456,
 			"pals_owned":30,"pals_box":25,"pals_party":5,"pals_lucky":2,"captures":410,"tribes_captured":88,
 			"paldeck":112,"technologies":180,"technology_points":40,"boss_technology_points":10,
 			"tower_bosses":3,"field_bosses":12,"dungeons":7,"zones_explored":55,"fast_travels":30,
@@ -67,15 +67,15 @@ func TestCollectRunning(t *testing.T) {
 		"palworld_players_current 2",
 		`palworld_player_ping_ms{name="Alice",player_id="abc123"} 42.5`,
 		`palworld_player_online{name="Alice",player_id="abc123"} 1`,
-		// Dérivées du parsing des saves (labels uid/name/guild).
+		// Dérivées du parsing des saves (labels uid/name/guild/guild_id).
 		"palworld_stats_up 1",
 		"palworld_pals_total 137",
 		"palworld_pals_lucky_total 3",
-		`palworld_player_pals_box{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 25`,
-		`palworld_player_pals_party{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 5`,
-		`palworld_player_pals_lucky{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 2`,
-		`palworld_player_level{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 42`,
-		`palworld_player_captures{uid="a1b2c3d4",name="Alice",guild="ExampleWorld"} 410`,
+		`palworld_player_pals_box{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 25`,
+		`palworld_player_pals_party{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 5`,
+		`palworld_player_pals_lucky{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 2`,
+		`palworld_player_level{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 42`,
+		`palworld_player_captures{uid="a1b2c3d4",name="Alice",guild="ExampleWorld",guild_id="9f0e1d2c"} 410`,
 	}
 	for _, m := range must {
 		if !strings.Contains(out, m) {

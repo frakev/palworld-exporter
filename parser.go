@@ -34,6 +34,7 @@ type statsPlayer struct {
 	UID                  string   `json:"uid"`
 	Name                 string   `json:"name"`
 	Guild                string   `json:"guild"`
+	GuildID              string   `json:"guild_id"`
 	Level                int      `json:"level"`
 	Exp                  int64    `json:"exp"`
 	PalsOwned            int      `json:"pals_owned"`
@@ -109,12 +110,16 @@ func collectStats(ctx context.Context, sc *statsClient, e *expo) {
 	e.gauge("palworld_pals_total", "Nombre total de Pals possédés (tous joueurs).", float64(d.PalCount))
 	e.gauge("palworld_pals_lucky_total", "Nombre total de Pals lucky (shiny), tous joueurs.", float64(d.LuckyCount))
 
-	// Par joueur. Labels uid (clé stable de la save) + name + guild.
+	// Par joueur. Labels uid (clé stable de la save) + name + guild + guild_id.
+	// Le nom de guilde n'est pas unique — deux guildes distinctes s'appellent
+	// « Unnamed Guild » tant que personne ne les renomme —, donc agréger par
+	// « guild » les confond. guild_id (préfixe 8 hexa de l'identifiant de la
+	// save, même forme que uid) est le discriminant à utiliser côté dashboard.
 	for _, p := range d.Players {
 		if p.UID == "" {
 			continue
 		}
-		l := lbl("uid", p.UID, "name", p.Name, "guild", p.Guild)
+		l := lbl("uid", p.UID, "name", p.Name, "guild", p.Guild, "guild_id", p.GuildID)
 		e.gaugeL("palworld_player_level", "Niveau du joueur (sauvegarde).", l, float64(p.Level))
 		e.gaugeL("palworld_player_exp", "Expérience totale du joueur.", l, float64(p.Exp))
 		e.gaugeL("palworld_player_pals_owned", "Nombre total de Pals possédés par le joueur.", l, float64(p.PalsOwned))

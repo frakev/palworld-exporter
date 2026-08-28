@@ -281,6 +281,9 @@ def view_metrics(data: dict) -> dict:
             "uid": p["uid"],
             "name": p.get("nickname") or "",
             "guild": guild_name.get(p.get("guild_uid")) or "",
+            # Le nom de guilde n'est pas unique (« Unnamed Guild » par défaut) :
+            # on expose aussi l'identifiant, seul discriminant fiable.
+            "guild_id": p.get("guild_uid") or "",
             "level": p.get("level") or 0,
             "exp": p.get("exp") or 0,
             "pals_owned": p.get("pals_owned") or 0,

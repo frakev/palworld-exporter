@@ -266,13 +266,14 @@
           "options": {
             "excludeByName": { "Time": true, "uid": true, "__name__": true, "player_id": true, "instance": true, "job": true },
             "renameByName": {
-              "name": "Player", "guild": "Guild",
+              "name": "Player", "guild": "Guild", "guild_id": "Guild ID",
               "Value #A": "Level", "Value #B": "Pals", "Value #C": "Box", "Value #D": "Party",
               "Value #E": "Lucky", "Value #F": "Captures", "Value #G": "Techs", "Value #H": "XP", "Value #I": "Last online"
             },
             "indexByName": {
-              "name": 0, "guild": 1, "Value #A": 2, "Value #B": 3, "Value #C": 4, "Value #D": 5,
-              "Value #E": 6, "Value #F": 7, "Value #G": 8, "Value #H": 9, "Value #I": 10
+              "name": 0, "guild": 1, "guild_id": 2,
+              "Value #A": 3, "Value #B": 4, "Value #C": 5, "Value #D": 6, "Value #E": 7,
+              "Value #F": 8, "Value #G": 9, "Value #H": 10, "Value #I": 11
             }
           }
         }
@@ -300,11 +301,11 @@
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "h": 9, "w": 24, "x": 0, "y": 30 },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "count by (guild) (palworld_player_level{guild=~\"$guild\"})", "refId": "A", "format": "table", "instant": true },
-        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "max by (guild) (palworld_player_level{guild=~\"$guild\"})", "refId": "B", "format": "table", "instant": true },
-        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild) (palworld_player_pals_owned{guild=~\"$guild\"})", "refId": "C", "format": "table", "instant": true },
-        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild) (palworld_player_pals_lucky{guild=~\"$guild\"})", "refId": "D", "format": "table", "instant": true },
-        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild) (palworld_player_captures{guild=~\"$guild\"})", "refId": "E", "format": "table", "instant": true }
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "count by (guild_id, guild) (palworld_player_level{guild=~\"$guild\"})", "refId": "A", "format": "table", "instant": true },
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "max by (guild_id, guild) (palworld_player_level{guild=~\"$guild\"})", "refId": "B", "format": "table", "instant": true },
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild_id, guild) (palworld_player_pals_owned{guild=~\"$guild\"})", "refId": "C", "format": "table", "instant": true },
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild_id, guild) (palworld_player_pals_lucky{guild=~\"$guild\"})", "refId": "D", "format": "table", "instant": true },
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum by (guild_id, guild) (palworld_player_captures{guild=~\"$guild\"})", "refId": "E", "format": "table", "instant": true }
       ],
       "transformations": [
         { "id": "merge", "options": {} },
@@ -313,10 +314,10 @@
           "options": {
             "excludeByName": { "Time": true },
             "renameByName": {
-              "guild": "Guild",
+              "guild": "Guild", "guild_id": "Guild ID",
               "Value #A": "Members", "Value #B": "Top level", "Value #C": "Pals", "Value #D": "Lucky", "Value #E": "Captures"
             },
-            "indexByName": { "guild": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4, "Value #E": 5 }
+            "indexByName": { "guild": 0, "guild_id": 1, "Value #A": 2, "Value #B": 3, "Value #C": 4, "Value #D": 5, "Value #E": 6 }
           }
         }
       ],
